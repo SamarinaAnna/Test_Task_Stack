@@ -1,0 +1,62 @@
+== Задание 1.
+
+CREATE FUNCTION select_orders_by_item_name (@item_name nvarchar(max))
+RETURNS TABLE
+AS
+RETURN 
+(
+	SELECT ord.row_id 'order_id', ( SELECT cust.name 'customer'
+				        FROM Customers as cust
+	                                WHERE cust.row_id = ord.customer_id),
+	                              COUNT(orIt.row_id) 'items_count'
+	From Orders as ord
+	JOIN OrderItems as orIt
+	ON (orIt.order_id = ord.row_id AND orIt.name = @item_name)
+	GROUP BY ord.row_id, ord.customer_id
+ );
+
+
+== Задание 2.
+
+CREATE FUNCTION calculate_total_price_for_orders_group (@row_id_group INT))
+RETURNS INT
+AS
+BEGIN
+    DECLARE @price_for_orders_group INT;
+    WITH Recursive (row_id, group_name)
+    AS
+    (
+      SELECT ord.row_id, ord.group_name
+      FROM Orders AS ord
+      WHERE ord.row_id = @row_id_group
+      UNION ALL
+      SELECT ord.row_id, ord.group_name
+      FROM Orders as ord
+      JOIN Recursive rec
+      ON (ord.parent_id = rec.row_id)
+     )
+     SELECT @price_for_orders_group = SUM(OrderItems.price)
+     FROM OrderItems
+     WHERE OrderItems.order_id = (SELECT rec.row_id
+                                  FROM Recursive rec
+                                  WHERE rec.group_name is NULL)
+     RETURN @price_for_orders_group
+END;
+
+== Задание 3.
+
+SELECT cust.name 'customer'
+FROM Customers as cust
+WHERE cust.row_id IN (SELECT ord.customer_id
+                     FROM Orders as ord
+                     WHERE YEAR(ord.registered_at) = '2020'
+                     GROUP BY ord.customer_id
+                     HAVING COUNT(ord.row_id) = (SELECT COUNT(correct_orders.row_id)
+                               			 FROM Orders AS correct_orders
+                                                 WHERE YEAR(correct_orders.registered_at) = '2020' AND
+                                                 correct_orders.customer_id = ord.customer_id AND (SELECT COUNT (orIt.order_id)
+                                       								  FROM OrderItems as orIt
+                                       	                                                          WHERE orIt.name = N'Кассовый Аппарат' AND orIt.order_id = correct_orders.row_id) >= 1
+
+                                                 ) 
+                    )                               
